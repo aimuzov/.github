@@ -1,0 +1,56 @@
+name: Release
+
+# Ведёт релизный PR вызывающего репо через release-please и сообщает,
+# выпустил ли этот пуш релиз. Вызывающему job нужны права на запись в contents,
+# pull-requests и actions, а release-please-config.json и
+# .release-please-manifest.json остаются в самом репо.
+on:
+  workflow_call:
+    outputs:
+      created:
+        description: '"true" when this push cut a release.'
+        value: ${{ jobs.release.outputs.created }}
+      tag:
+        description: Tag of the release cut by this push, e.g. v1.2.0.
+        value: ${{ jobs.release.outputs.tag }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      created: ${{ steps.release-please.outputs.release_created }}
+      tag: ${{ steps.release-please.outputs.tag_name }}
+    steps:
+      - id: release-please
+        uses: googleapis/release-please-action@v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # Release PR создаёт github-actions[bot], поэтому GitHub придерживает
+      # его прогоны pull_request до чьего-нибудь одобрения, а PR остаётся
+      # заблокирован обязательной проверкой.
+      #
+      # Прогоны появляются через несколько секунд после изменения PR,
+      # поэтому одобряем всё, что появится в течение минуты.
+      - if: steps.release-please.outputs.pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.release-please.outputs.pr }}
+        run: |
+          number=$(jq -r .number <<< "$PR")
+          sha=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          approved=0
+          for _ in $(seq 12); do
+            sleep 5
+            runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=pull_request&head_sha=$sha" \
+              --jq '.workflow_runs[] | select(.conclusion == "action_required") | .id')
+            for run in $runs; do
+              gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$run/approve" >/dev/null
+              echo "approved run $run"
+              approved=$((approved + 1))
+            done
+            if [[ $approved -gt 0 && -z $runs ]]; then break; fi
+          done
+          if [[ $approved -eq 0 ]]; then echo "no runs of the release PR waited for approval"; fi
