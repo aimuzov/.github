@@ -1,6 +1,6 @@
 name: PR meta
 
-# Shared by every repository of the organization through a short pr-meta.yml caller:
+# Shared by every repository of the account through a short pr-meta.yml caller:
 # the pull request goes to the owner and gets a label from its conventional-commits title.
 on:
   workflow_call:

@@ -1,0 +1,31 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"description": "Base Renovate preset for every repository of the aimuzov account: weekly grouped updates, non-major ones merge themselves",
+	"extends": ["config:recommended", ":semanticCommits", ":semanticCommitTypeAll(build)", "schedule:weekly"],
+	"timezone": "Europe/Moscow",
+	"minimumReleaseAge": "3 days",
+	"prConcurrentLimit": 5,
+	"packageRules": [
+		{
+			"description": "What ends up in production gets fix(deps): release-please cuts a release for it, while build(deps) waits for the next one",
+			"matchDepTypes": ["dependencies"],
+			"semanticCommitType": "fix"
+		},
+		{
+			"description": "Base images of the containers end up in production too",
+			"matchManagers": ["dockerfile", "docker-compose"],
+			"semanticCommitType": "fix"
+		},
+		{
+			"description": "GitHub Actions in one PR",
+			"groupName": "github actions",
+			"matchManagers": ["github-actions"]
+		},
+		{
+			"description": "A merge into main doesn't deploy, a release does, so non-major updates merge themselves once the checks pass. Renovate merges by itself, without the repo's auto-merge setting",
+			"matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+			"automerge": true,
+			"platformAutomerge": false
+		}
+	]
+}
