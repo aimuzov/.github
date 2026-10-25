@@ -24,7 +24,9 @@ jobs:
       TITLE: ${{ github.event.pull_request.title }}
       ASSIGNEE: ${{ inputs.assignee }}
     steps:
+      # the owner's own pull requests need no assignee, and the bot's assignment mails them each time
       - name: Assign
+        if: github.event.pull_request.user.login != inputs.assignee
         run: gh pr edit "$PR" --add-assignee "$ASSIGNEE"
 
       - name: Label
